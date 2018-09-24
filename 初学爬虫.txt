@@ -58,3 +58,90 @@ from scrapy import cmdline
 
 cmdline.execute('scrapy crawl douban_spider'.split())
 就可以在pycharm里直接运行
+
+8.编写douban_spider.py
+    #默认解析方法
+    def parse(self, response):
+        #循环电影的条目
+        movie_list = response.xpath("//div[@class='article']//ol[@class='grid_view']/li")
+        for i_item in movie_list:
+            #导入items
+            douban_item = DoubanItem()
+            #写详细的数据解析
+            douban_item['number'] = i_item.xpath(".//div[@class='item']//em/text()").extract_first()
+            #需要将数据yield进pipeline里
+            yield douban_item
+        #解析下一页规则，取下一页的xpath
+        next_link = response.xpath("//span[@class='next']/link/@href").extract()
+        if next_link:
+            next_link = next_link[0]
+            yield scrapy.Request("https://movie.douban.com/top250"+next_link, callback=self.parse)
+
+9.保存为json和CSV文件
+scrapy crawl douban_spider -o text.json
+scrapy crawl douban_spider -o text.csv
+
+10.存储到mongodb
+首先在settings里开启
+ITEM_PIPELINES = {
+    'douban.pipelines.DoubanPipeline': 300,
+}
+接着写
+mongo_host = 'your host'
+mongo_port = 27017
+mongo_db_name = 'douban'
+mongo_db_collection = 'douban_movie'
+然后到pipelines.py里
+import pymongo
+from douban.settings import mongo_db_collection,mongo_db_name,mongo_host,mongo_port
+
+class DoubanPipeline(object):
+    def __init__(self):
+        host = mongo_host
+        port = mongo_port
+        dbname = mongo_db_name
+        sheetname = mongo_db_collection
+        client = pymongo.MongoClient(host = host,port=port)
+        mydb = client[dbname]
+        self.post = mydb[sheetname]
+
+
+    def process_item(self, item,spider):
+        data = dict(item)
+        self.post.insert(data)
+        return item
+
+11.ip代理中间件编写
+编写middleware.py
+class my_proxy(object):
+    def process_request(self, request, spider):
+        request.meta['proxy'] = 'http-cla.abuyun.com:9030'
+        proxy_name_pass= b'用户名：密码'
+        encode_pass_name = base64.b64encode(proxy_name_pass)
+        request.headers['Proxy-Authorization'] = 'Basic '+encode_pass_name.decode()
+
+然后在settings.py里设置
+DOWNLOADER_MIDDLEWARES = {
+    'douban.middlewares.my_proxy': 543,
+}
+
+12.user-agent的编写
+编写middleware.py
+class my_useragent(object):
+    def process_request(self, request, spider):
+        #搜一个userangent
+        USER_AGENT_LIST=[
+            #搜出来的列表
+        ]
+        agent = random.choice(USER_AGENT_LIST)
+        request.headers['User_Agent'] = agent
+
+然后在settings.py里设置
+DOWNLOADER_MIDDLEWARES = {
+    'douban.middlewares.my_proxy': 543,
+    'douban.middlewares.my_useragent': 544,
+}
+
+13.注意事项
+中间件定义要在settings文件内启用
+爬虫文件名和爬虫名称不能相同，spiders目录内不能存在相同爬虫名称的项目文件
