@@ -1,0 +1,60 @@
+一、新建scrapy项目
+1.创建一个新的project
+scrapy startproject douban
+
+2.settings的一些修改
+ROBOTSTXT_OBEY = False
+DOWNLOAD_DELAY = 0.5
+
+3.生成编写正则表达式的py文件
+cd douban
+cd douban
+cd spiders
+scrapy genspider douban_spider movie.douban.com
+
+4.编写items.py文件
+class DoubanItem(scrapy.Item):
+    # define the fields for your item here like:
+    # name = scrapy.Field()
+    #序号
+    number = scrapy.Field()
+    #电影的名称
+    movie_name = scrapy.Field()
+    #介绍
+    introduce = scrapy.Field()
+    #明星
+    star = scrapy.Field()
+    #评价
+    evalutate = scrapy.Field()
+    #描述
+    describe = scrapy.Field()
+
+5.编写douban_spdiers.py文件
+# -*- coding: utf-8 -*-
+import scrapy
+
+
+class DoubanSpiderSpider(scrapy.Spider):
+    name = 'douban_spider'
+    #允许的域名
+    allowed_domains = ['movie.douban.com']
+    #入口url，扔到调度器里
+    start_urls = ['https://movie.douban.com/top250']
+
+    def parse(self, response):
+        print(response.text)
+
+6.启动douban_spider
+scrapy crawl douban_spider
+这时会发现返回了403错误
+此时要返回到settings，编辑USER_AGENT
+获取USER_AGENT：打开豆瓣top250，F12，找到即可
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3452.0 Safari/537.36
+然后重新运行scrapy crawl douban_spider
+
+7.添加main.py文件
+新建一个main.py文件，写入
+from scrapy import cmdline
+
+cmdline.execute('scrapy crawl douban_spider'.split())
+就可以在pycharm里直接运行
